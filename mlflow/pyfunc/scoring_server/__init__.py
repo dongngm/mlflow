@@ -171,6 +171,7 @@ def init(model):
         we take data as CSV or json, convert it to a Pandas DataFrame or Numpy,
         generate predictions and convert them back to json.
         """
+        result = StringIO()
         # Convert from CSV to pandas
         try:
             if flask.request.content_type == CONTENT_TYPE_CSV:
@@ -196,8 +197,9 @@ def init(model):
                         'time': current_time_rfc3339_str(),
                         'data': {},
                     }
+                json.dump(response, result)
                 return flask.Response(
-                    response=flask.jsonify(response),
+                    response=result.getvalue(),
                     status=400,
                     mimetype='application/json')
         except MlflowException as e:
@@ -208,8 +210,9 @@ def init(model):
                     'time': current_time_rfc3339_str(),
                     'data': {},
                 }
+            json.dump(response, result)
             return flask.Response(
-                response=flask.jsonify(response),
+                response=result.getvalue(),
                 status=400,
                 mimetype='application/json')
 
@@ -218,12 +221,26 @@ def init(model):
         try:
             raw_predictions = model.predict(data)
         except Exception:
-            _handle_serving_error(
-                error_message=(
-                    "Encountered an unexpected error while evaluating the model. Verify"
+            response = \
+                {
+                    'verdict': Verdict.failure,
+                    'message': "Encountered an unexpected error while evaluating the model. Verify"
                     " that the serialized input Dataframe is compatible with the model for"
-                    " inference."),
-                error_code=BAD_REQUEST)
+                    " inference.",
+                    'time': current_time_rfc3339_str(),
+                    'data': {},
+                }
+            json.dump(response, result)
+            return flask.Response(
+                response=result.getvalue(),
+                status=400,
+                mimetype='application/json')
+            # _handle_serving_error(
+            #     error_message=(
+            #         "Encountered an unexpected error while evaluating the model. Verify"
+            #         " that the serialized input Dataframe is compatible with the model for"
+            #         " inference."),
+            #     error_code=BAD_REQUEST)
         result = StringIO()
         predictions_to_json(raw_predictions, result)
         return flask.Response(response=result.getvalue(), status=200, mimetype='application/json')
