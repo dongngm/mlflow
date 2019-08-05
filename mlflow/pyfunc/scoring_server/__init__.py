@@ -17,13 +17,14 @@ import flask
 import json
 from json import JSONEncoder
 import logging
+from mlflow.pyfunc.scoring_server.time import current_time_rfc3339_str
+from mlflow.pyfunc.scoring_server.verdict import Verdict
 import numpy as np
 import pandas as pd
 from six import reraise
 import sys
-from time import current_time_rfc3339_str
 import traceback
-from verdict import Verdict
+
 
 # NB: We need to be careful what we import form mlflow here. Scoring server is used from within
 # model's conda environment. The version of mlflow doing the serving (outside) and the version of
