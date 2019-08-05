@@ -75,27 +75,13 @@ def parse_json_input(json_input, orient="split"):
     try:
         return pd.read_json(json_input, orient=orient, dtype=False)
     except Exception:
-        response = \
-        {
-            'verdict': Verdict.failure,
-            'message': "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
-                       " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
-                       " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
-                       " method.".format(orient=orient),
-            'time': current_time_rfc3339_str(),
-            'data': {},
-        }
-        return flask.Response(
-            response=response,
-            status=400,
-            mimetype='application/json')
-        # _handle_serving_error(
-        #     error_message=(
-        #         "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
-        #         " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
-        #         " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
-        #         " method.".format(orient=orient)),
-        #     error_code=MALFORMED_REQUEST)
+        _handle_serving_error(
+            error_message=(
+                "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+                " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
+                " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
+                " method.".format(orient=orient)),
+            error_code=MALFORMED_REQUEST)
 
 
 def parse_csv_input(csv_input):
@@ -107,25 +93,12 @@ def parse_csv_input(csv_input):
     try:
         return pd.read_csv(csv_input)
     except Exception:
-        response = \
-        {
-            'verdict': Verdict.failure,
-            'message': "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
-                       " a valid CSV-formatted Pandas DataFrame produced using the"
-                       " `pandas.DataFrame.to_csv()` method.",
-            'time': current_time_rfc3339_str(),
-            'data': {},
-        }
-        return flask.Response(
-            response=response,
-            status=400,
-            mimetype='application/json')
-        # _handle_serving_error(
-        #     error_message=(
-        #         "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
-        #         " a valid CSV-formatted Pandas DataFrame produced using the"
-        #         " `pandas.DataFrame.to_csv()` method."),
-        #     error_code=MALFORMED_REQUEST)
+        _handle_serving_error(
+            error_message=(
+                "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+                " a valid CSV-formatted Pandas DataFrame produced using the"
+                " `pandas.DataFrame.to_csv()` method."),
+            error_code=MALFORMED_REQUEST)
 
 
 def parse_split_oriented_json_input_to_numpy(json_input):
@@ -140,28 +113,14 @@ def parse_split_oriented_json_input_to_numpy(json_input):
                             data=np.array(json_input_list['data'], dtype=object),
                             columns=json_input_list['columns']).infer_objects()
     except Exception:
-        response = \
-        {
-            'verdict': Verdict.failure,
-            'message': "Failed to parse input as a Numpy. Ensure that the input is"
-                       " a valid JSON-formatted Pandas DataFrame with the split orient"
-                       " produced using the `pandas.DataFrame.to_json(..., orient='split')`"
-                       " method.",
-            'time': current_time_rfc3339_str(),
-            'data': {},
-        }
-        return flask.Response(
-            response=response,
-            status=400,
-            mimetype='application/json')
-        # _handle_serving_error(
-        #     error_message=(
-        #         "Failed to parse input as a Numpy. Ensure that the input is"
-        #         " a valid JSON-formatted Pandas DataFrame with the split orient"
-        #         " produced using the `pandas.DataFrame.to_json(..., orient='split')`"
-        #         " method."
-        #     ),
-        #     error_code=MALFORMED_REQUEST)
+        _handle_serving_error(
+            error_message=(
+                "Failed to parse input as a Numpy. Ensure that the input is"
+                " a valid JSON-formatted Pandas DataFrame with the split orient"
+                " produced using the `pandas.DataFrame.to_json(..., orient='split')`"
+                " method."
+            ),
+            error_code=MALFORMED_REQUEST)
 
 
 def predictions_to_json(raw_predictions, output):
@@ -213,26 +172,46 @@ def init(model):
         generate predictions and convert them back to json.
         """
         # Convert from CSV to pandas
-        if flask.request.content_type == CONTENT_TYPE_CSV:
-            data = flask.request.data.decode('utf-8')
-            csv_input = StringIO(data)
-            data = parse_csv_input(csv_input=csv_input)
-        elif flask.request.content_type in [CONTENT_TYPE_JSON, CONTENT_TYPE_JSON_SPLIT_ORIENTED]:
-            data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
-                                    orient="split")
-        elif flask.request.content_type == CONTENT_TYPE_JSON_RECORDS_ORIENTED:
-            data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
-                                    orient="records")
-        elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_NUMPY:
-            data = parse_split_oriented_json_input_to_numpy(flask.request.data.decode('utf-8'))
-        else:
+        try:
+            if flask.request.content_type == CONTENT_TYPE_CSV:
+                data = flask.request.data.decode('utf-8')
+                csv_input = StringIO(data)
+                data = parse_csv_input(csv_input=csv_input)
+            elif flask.request.content_type in [CONTENT_TYPE_JSON, CONTENT_TYPE_JSON_SPLIT_ORIENTED]:
+                data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
+                                        orient="split")
+            elif flask.request.content_type == CONTENT_TYPE_JSON_RECORDS_ORIENTED:
+                data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
+                                        orient="records")
+            elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_NUMPY:
+                data = parse_split_oriented_json_input_to_numpy(flask.request.data.decode('utf-8'))
+            else:
+                response = \
+                    {
+                        'verdict': Verdict.failure,
+                        'message': "This predictor only supports the following content types,"
+                                   " {supported_content_types}. Got '{received_content_type}'.".format(
+                                    supported_content_types=CONTENT_TYPES,
+                                    received_content_type=flask.request.content_type),
+                        'time': current_time_rfc3339_str(),
+                        'data': {},
+                    }
+                return flask.Response(
+                    response=response,
+                    status=400,
+                    mimetype='application/json')
+        except MlflowException as e:
+            response = \
+                {
+                    'verdict': Verdict.failure,
+                    'message': e.message,
+                    'time': current_time_rfc3339_str(),
+                    'data': {},
+                }
             return flask.Response(
-                response=("This predictor only supports the following content types,"
-                          " {supported_content_types}. Got '{received_content_type}'.".format(
-                            supported_content_types=CONTENT_TYPES,
-                            received_content_type=flask.request.content_type)),
-                status=415,
-                mimetype='text/plain')
+                response=response,
+                status=400,
+                mimetype='application/json')
 
         # Do the prediction
         # pylint: disable=broad-except
