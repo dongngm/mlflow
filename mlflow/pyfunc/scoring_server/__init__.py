@@ -21,7 +21,9 @@ import numpy as np
 import pandas as pd
 from six import reraise
 import sys
+from time import current_time_rfc3339_str
 import traceback
+from verdict import Verdict
 
 # NB: We need to be careful what we import form mlflow here. Scoring server is used from within
 # model's conda environment. The version of mlflow doing the serving (outside) and the version of
@@ -72,13 +74,27 @@ def parse_json_input(json_input, orient="split"):
     try:
         return pd.read_json(json_input, orient=orient, dtype=False)
     except Exception:
-        _handle_serving_error(
-            error_message=(
-                "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
-                " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
-                " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
-                " method.".format(orient=orient)),
-            error_code=MALFORMED_REQUEST)
+        response = \
+        {
+            'verdict': Verdict.failure,
+            'message': "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+                       " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
+                       " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
+                       " method.".format(orient=orient),
+            'time': current_time_rfc3339_str(),
+            'data': {},
+        }
+        return flask.Response(
+            response=response,
+            status=400,
+            mimetype='application/json')
+        # _handle_serving_error(
+        #     error_message=(
+        #         "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+        #         " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
+        #         " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
+        #         " method.".format(orient=orient)),
+        #     error_code=MALFORMED_REQUEST)
 
 
 def parse_csv_input(csv_input):
@@ -90,12 +106,25 @@ def parse_csv_input(csv_input):
     try:
         return pd.read_csv(csv_input)
     except Exception:
-        _handle_serving_error(
-            error_message=(
-                "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
-                " a valid CSV-formatted Pandas DataFrame produced using the"
-                " `pandas.DataFrame.to_csv()` method."),
-            error_code=MALFORMED_REQUEST)
+        response = \
+        {
+            'verdict': Verdict.failure,
+            'message': "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+                       " a valid CSV-formatted Pandas DataFrame produced using the"
+                       " `pandas.DataFrame.to_csv()` method.",
+            'time': current_time_rfc3339_str(),
+            'data': {},
+        }
+        return flask.Response(
+            response=response,
+            status=400,
+            mimetype='application/json')
+        # _handle_serving_error(
+        #     error_message=(
+        #         "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+        #         " a valid CSV-formatted Pandas DataFrame produced using the"
+        #         " `pandas.DataFrame.to_csv()` method."),
+        #     error_code=MALFORMED_REQUEST)
 
 
 def parse_split_oriented_json_input_to_numpy(json_input):
@@ -110,14 +139,28 @@ def parse_split_oriented_json_input_to_numpy(json_input):
                             data=np.array(json_input_list['data'], dtype=object),
                             columns=json_input_list['columns']).infer_objects()
     except Exception:
-        _handle_serving_error(
-            error_message=(
-                "Failed to parse input as a Numpy. Ensure that the input is"
-                " a valid JSON-formatted Pandas DataFrame with the split orient"
-                " produced using the `pandas.DataFrame.to_json(..., orient='split')`"
-                " method."
-            ),
-            error_code=MALFORMED_REQUEST)
+        response = \
+        {
+            'verdict': Verdict.failure,
+            'message': "Failed to parse input as a Numpy. Ensure that the input is"
+                       " a valid JSON-formatted Pandas DataFrame with the split orient"
+                       " produced using the `pandas.DataFrame.to_json(..., orient='split')`"
+                       " method.",
+            'time': current_time_rfc3339_str(),
+            'data': {},
+        }
+        return flask.Response(
+            response=response,
+            status=400,
+            mimetype='application/json')
+        # _handle_serving_error(
+        #     error_message=(
+        #         "Failed to parse input as a Numpy. Ensure that the input is"
+        #         " a valid JSON-formatted Pandas DataFrame with the split orient"
+        #         " produced using the `pandas.DataFrame.to_json(..., orient='split')`"
+        #         " method."
+        #     ),
+        #     error_code=MALFORMED_REQUEST)
 
 
 def predictions_to_json(raw_predictions, output):
