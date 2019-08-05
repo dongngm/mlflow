@@ -197,7 +197,7 @@ def init(model):
                         'data': {},
                     }
                 return flask.Response(
-                    response=response,
+                    response=flask.jsonify(response),
                     status=400,
                     mimetype='application/json')
         except MlflowException as e:
@@ -209,7 +209,7 @@ def init(model):
                     'data': {},
                 }
             return flask.Response(
-                response=response,
+                response=flask.jsonify(response),
                 status=400,
                 mimetype='application/json')
 
