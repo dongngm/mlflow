@@ -42,3 +42,6 @@ PORT = click.option("--port", "-p", default=5000,
 # We use None to disambiguate manually selecting "4"
 WORKERS = click.option("--workers", "-w", default=None,
                        help="Number of gunicorn worker processes to handle requests (default: 4).")
+
+ROUTE = click.option("--route", "-r", default="/invocations",
+                     help="Route to request scoring server (default: /invocations).")
