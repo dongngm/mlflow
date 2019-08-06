@@ -46,6 +46,7 @@ except ImportError:
     from io import StringIO
 
 _SERVER_MODEL_PATH = "__pyfunc_model_path__"
+_SERVING_ROUTE = "/invocations"
 
 CONTENT_TYPE_CSV = "text/csv"
 CONTENT_TYPE_JSON = "application/json"
@@ -163,7 +164,7 @@ def init(model):
         status = 200 if health else 404
         return flask.Response(response='\n', status=status, mimetype='application/json')
 
-    @app.route('/invocations', methods=['POST'])
+    @app.route(_SERVING_ROUTE, methods=['POST'])
     @catch_mlflow_exception
     def transformation():  # pylint: disable=unused-variable
         """

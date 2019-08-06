@@ -56,7 +56,7 @@ class PyFuncBackend(FlavorBackend):
             scoring_server._predict(local_uri, input_path, output_path, content_type,
                                     json_format)
 
-    def serve(self, model_uri, port, host):
+    def serve(self, model_uri, port, host, route):
         """
         Serve pyfunc model locally.
         """
@@ -71,6 +71,7 @@ class PyFuncBackend(FlavorBackend):
             nworkers=self._nworkers)
         command_env = os.environ.copy()
         command_env[scoring_server._SERVER_MODEL_PATH] = local_uri
+        command_env[scoring_server._SERVING_ROUTE] = route
         if not self._no_conda and ENV in self._config:
             conda_env_path = os.path.join(local_path, self._config[ENV])
             return _execute_in_conda_env(conda_env_path, command, self._install_mlflow,
