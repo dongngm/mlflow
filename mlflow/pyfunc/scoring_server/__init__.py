@@ -148,7 +148,7 @@ def _handle_serving_error(error_message, error_code):
                 stack_trace=traceback_buf.getvalue()))
 
 
-def init(model):
+def init(model, route):
     """
     Initialize the server. Loads pyfunc model from the path.
     """
@@ -164,7 +164,7 @@ def init(model):
         status = 200 if health else 404
         return flask.Response(response='\n', status=status, mimetype='application/json')
 
-    @app.route(_SERVING_ROUTE, methods=['POST'])
+    @app.route(route, methods=['POST'])
     @catch_mlflow_exception
     def transformation():  # pylint: disable=unused-variable
         """
