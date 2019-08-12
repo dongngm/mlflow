@@ -21,6 +21,7 @@ from mlflow.pyfunc.scoring_server.time import current_time_rfc3339_str
 from mlflow.pyfunc.scoring_server.verdict import Verdict
 import numpy as np
 import pandas as pd
+from pandas.io.json import json_normalize
 from six import reraise
 import sys
 import traceback
@@ -65,16 +66,20 @@ CONTENT_TYPES = [
 _logger = logging.getLogger(__name__)
 
 
-def parse_json_input(json_input, orient="split"):
+def parse_json_input(json_input, orient="split", normalize=False):
     """
     :param json_input: A JSON-formatted string representation of a Pandas DataFrame, or a stream
                        containing such a string representation.
     :param orient: The Pandas DataFrame orientation of the JSON input. This is either 'split'
                    or 'records'.
+    :param normalize: Whether the json_input should be normalize (flatten) or not
     """
     # pylint: disable=broad-except
     try:
-        return pd.read_json(json_input, orient=orient, dtype=False)
+        if not normalize:
+            return pd.read_json(json_input, orient=orient, dtype=False)
+        else:
+            return json_normalize(json.loads(json_input))
     except Exception:
         _handle_serving_error(
             error_message=(
@@ -140,7 +145,7 @@ def _handle_serving_error(error_message, error_code):
                        the codes listed in the `mlflow.protos.databricks_pb2` proto.
     """
     traceback_buf = StringIO()
-    traceback.print_exc(file=traceback_buf)
+    tracebaint_exc(file=traceback_buf)
     reraise(MlflowException,
             MlflowException(
                 message=error_message,
@@ -179,7 +184,11 @@ def init(model, route):
                 data = flask.request.data.decode('utf-8')
                 csv_input = StringIO(data)
                 data = parse_csv_input(csv_input=csv_input)
-            elif flask.request.content_type in [CONTENT_TYPE_JSON, CONTENT_TYPE_JSON_SPLIT_ORIENTED]:
+            elif flask.request.content_type == CONTENT_TYPE_JSON:
+                # dongngm: request from TS internal is json type with nested structure
+                data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
+                                        normalize=True)
+            elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_ORIENTED:
                 data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
                                         orient="split")
             elif flask.request.content_type == CONTENT_TYPE_JSON_RECORDS_ORIENTED:
@@ -188,6 +197,7 @@ def init(model, route):
             elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_NUMPY:
                 data = parse_split_oriented_json_input_to_numpy(flask.request.data.decode('utf-8'))
             else:
+                # dongngm: adapt to TS's communication standard
                 response = \
                     {
                         'verdict': Verdict.failure,
@@ -204,6 +214,7 @@ def init(model, route):
                     status=400,
                     mimetype='application/json')
         except MlflowException as e:
+            # dongngm: adapt to TS's communication standard
             response = \
                 {
                     'verdict': Verdict.failure,
@@ -222,6 +233,7 @@ def init(model, route):
         try:
             raw_predictions = model.predict(data)
         except Exception:
+            # dongngm: adapt to TS's communication standard
             response = \
                 {
                     'verdict': Verdict.failure,
@@ -242,7 +254,7 @@ def init(model, route):
             #         " that the serialized input Dataframe is compatible with the model for"
             #         " inference."),
             #     error_code=BAD_REQUEST)
-        result = StringIO()
+        # result = StringIO()
         predictions_to_json(raw_predictions, result)
         return flask.Response(response=result.getvalue(), status=200, mimetype='application/json')
 
