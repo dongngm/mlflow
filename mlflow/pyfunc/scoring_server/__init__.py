@@ -56,11 +56,11 @@ CONTENT_TYPE_JSON_SPLIT_ORIENTED = "application/json; format=pandas-split"
 CONTENT_TYPE_JSON_SPLIT_NUMPY = "application/json-numpy-split"
 
 CONTENT_TYPES = [
-    CONTENT_TYPE_CSV,
+    # CONTENT_TYPE_CSV,
     CONTENT_TYPE_JSON,
-    CONTENT_TYPE_JSON_RECORDS_ORIENTED,
-    CONTENT_TYPE_JSON_SPLIT_ORIENTED,
-    CONTENT_TYPE_JSON_SPLIT_NUMPY
+    # CONTENT_TYPE_JSON_RECORDS_ORIENTED,
+    # CONTENT_TYPE_JSON_SPLIT_ORIENTED,
+    # CONTENT_TYPE_JSON_SPLIT_NUMPY
 ]
 
 _logger = logging.getLogger(__name__)
@@ -82,11 +82,8 @@ def parse_json_input(json_input, orient="split", normalize=False):
             return json_normalize(json.loads(json_input))
     except Exception:
         _handle_serving_error(
-            error_message=(
-                "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
-                " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
-                " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
-                " method.".format(orient=orient)),
+            error_message="Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+                          " a valid JSON-formatted",
             error_code=MALFORMED_REQUEST)
 
 
@@ -145,7 +142,7 @@ def _handle_serving_error(error_message, error_code):
                        the codes listed in the `mlflow.protos.databricks_pb2` proto.
     """
     traceback_buf = StringIO()
-    tracebaint_exc(file=traceback_buf)
+    traceback.print_exc(file=traceback_buf)
     reraise(MlflowException,
             MlflowException(
                 message=error_message,
@@ -180,22 +177,23 @@ def init(model, route):
         result = StringIO()
         # Convert from CSV to pandas
         try:
-            if flask.request.content_type == CONTENT_TYPE_CSV:
-                data = flask.request.data.decode('utf-8')
-                csv_input = StringIO(data)
-                data = parse_csv_input(csv_input=csv_input)
-            elif flask.request.content_type == CONTENT_TYPE_JSON:
-                # dongngm: request from TS internal is json type with nested structure
+            # if flask.request.content_type == CONTENT_TYPE_CSV:
+            #     data = flask.request.data.decode('utf-8')
+            #     csv_input = StringIO(data)
+            #     data = parse_csv_input(csv_input=csv_input)
+            if flask.request.content_type == CONTENT_TYPE_JSON:
+                # dongngm: request from TS internal is json type with nested structure,
+                # currently only support application/json
                 data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
                                         normalize=True)
-            elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_ORIENTED:
-                data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
-                                        orient="split")
-            elif flask.request.content_type == CONTENT_TYPE_JSON_RECORDS_ORIENTED:
-                data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
-                                        orient="records")
-            elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_NUMPY:
-                data = parse_split_oriented_json_input_to_numpy(flask.request.data.decode('utf-8'))
+            # elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_ORIENTED:
+            #     data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
+            #                             orient="split")
+            # elif flask.request.content_type == CONTENT_TYPE_JSON_RECORDS_ORIENTED:
+            #     data = parse_json_input(json_input=flask.request.data.decode('utf-8'),
+            #                             orient="records")
+            # elif flask.request.content_type == CONTENT_TYPE_JSON_SPLIT_NUMPY:
+            #     data = parse_split_oriented_json_input_to_numpy(flask.request.data.decode('utf-8'))
             else:
                 # dongngm: adapt to TS's communication standard
                 response = \
@@ -213,6 +211,10 @@ def init(model, route):
                     response=result.getvalue(),
                     status=400,
                     mimetype='application/json')
+
+        # Do the prediction
+        # pylint: disable=broad-except
+            raw_predictions = model.predict(data)
         except MlflowException as e:
             # dongngm: adapt to TS's communication standard
             response = \
@@ -228,33 +230,6 @@ def init(model, route):
                 status=400,
                 mimetype='application/json')
 
-        # Do the prediction
-        # pylint: disable=broad-except
-        try:
-            raw_predictions = model.predict(data)
-        except Exception:
-            # dongngm: adapt to TS's communication standard
-            response = \
-                {
-                    'verdict': Verdict.failure,
-                    'message': "Encountered an unexpected error while evaluating the model. Verify"
-                    " that the serialized input Dataframe is compatible with the model for"
-                    " inference.",
-                    'time': current_time_rfc3339_str(),
-                    'data': {},
-                }
-            json.dump(response, result)
-            return flask.Response(
-                response=result.getvalue(),
-                status=400,
-                mimetype='application/json')
-            # _handle_serving_error(
-            #     error_message=(
-            #         "Encountered an unexpected error while evaluating the model. Verify"
-            #         " that the serialized input Dataframe is compatible with the model for"
-            #         " inference."),
-            #     error_code=BAD_REQUEST)
-        # result = StringIO()
         predictions_to_json(raw_predictions, result)
         return flask.Response(response=result.getvalue(), status=200, mimetype='application/json')
 
